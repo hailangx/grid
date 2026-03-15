@@ -9,6 +9,10 @@ declare function acquireVsCodeApi(): {
 
 const vscode = acquireVsCodeApi();
 
+function wlog(msg: string) {
+  console.log(`[Grid Webview] ${msg}`);
+}
+
 interface TerminalCell {
   id: string;
   terminal: Terminal;
@@ -32,17 +36,23 @@ class TerminalGrid {
   };
 
   constructor() {
+    wlog('TerminalGrid constructor');
     this.gridContainer = document.getElementById('grid')!;
     this.setupMessageHandler();
     this.setupResizeObserver();
     this.setupToolbar();
     this.setupKeyboardShortcuts();
 
+    wlog('Sending ready message to extension host');
     vscode.postMessage({ type: 'ready' });
   }
 
   private setupToolbar() {
-    document.getElementById('add-terminal')!.addEventListener('click', () => {
+    wlog('setupToolbar: looking for #add-terminal');
+    const addBtn = document.getElementById('add-terminal');
+    wlog(`setupToolbar: addBtn=${!!addBtn}`);
+    addBtn?.addEventListener('click', () => {
+      wlog('+ New Terminal button clicked');
       vscode.postMessage({ type: 'requestNewTerminal' });
     });
 
@@ -79,6 +89,7 @@ class TerminalGrid {
   private setupMessageHandler() {
     window.addEventListener('message', (event) => {
       const message = event.data;
+      wlog(`Received message: type=${message.type}, id=${message.id || 'none'}`);
       switch (message.type) {
         case 'config':
           this.config.fontSize = message.fontSize ?? this.config.fontSize;
@@ -98,6 +109,7 @@ class TerminalGrid {
   }
 
   private createTerminalCell(id: string, title: string) {
+    wlog(`createTerminalCell: id=${id}, title=${title}`);
     // Cell container
     const cell = document.createElement('div');
     cell.className = 'terminal-cell';
@@ -286,7 +298,19 @@ class TerminalGrid {
 
 // Initialize
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new TerminalGrid());
+  document.addEventListener('DOMContentLoaded', () => {
+    try {
+      wlog('DOMContentLoaded, creating TerminalGrid');
+      new TerminalGrid();
+    } catch (e: any) {
+      console.error('[Grid Webview] CRASH in constructor:', e);
+    }
+  });
 } else {
-  new TerminalGrid();
+  try {
+    wlog('Document ready, creating TerminalGrid');
+    new TerminalGrid();
+  } catch (e: any) {
+    console.error('[Grid Webview] CRASH in constructor:', e);
+  }
 }

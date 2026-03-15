@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { TerminalGridPanel } from './TerminalGridPanel';
+import { log, initLog } from './log';
 
 /**
  * Stub Pseudoterminal that lives in VS Code's built-in terminal panel.
@@ -30,6 +31,9 @@ class GridRedirectPty implements vscode.Pseudoterminal {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  initLog(context);
+  log('Extension activating...');
+  log(`Extension path: ${context.extensionPath}`);
   const interceptEnabled = () =>
     vscode.workspace
       .getConfiguration('grid')
@@ -39,10 +43,12 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('grid.open', () => {
+      log('Command: grid.open');
       TerminalGridPanel.createOrShow(context);
     }),
 
     vscode.commands.registerCommand('grid.addTerminal', () => {
+      log('Command: grid.addTerminal');
       if (TerminalGridPanel.currentPanel) {
         TerminalGridPanel.currentPanel.addTerminal();
       } else {
@@ -73,6 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
       provideTerminalProfile(
         _token: vscode.CancellationToken
       ): vscode.ProviderResult<vscode.TerminalProfile> {
+        log('Terminal profile provider triggered');
         // Open grid and add a terminal cell
         TerminalGridPanel.createOrShow(context);
         setTimeout(() => {
@@ -115,6 +122,9 @@ export function activate(context: vscode.ExtensionContext) {
       },
     });
   }
+  log('Extension activated successfully');
 }
 
-export function deactivate() {}
+export function deactivate() {
+  log('Extension deactivating');
+}

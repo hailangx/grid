@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { PtyManager } from './PtyManager';
+import { log } from './log';
 
 export class TerminalGridPanel {
   public static currentPanel: TerminalGridPanel | undefined;
@@ -12,13 +13,16 @@ export class TerminalGridPanel {
   private terminalCounter = 0;
 
   public static createOrShow(context: vscode.ExtensionContext) {
+    log('createOrShow called');
     const column = vscode.ViewColumn.Active;
 
     if (TerminalGridPanel.currentPanel) {
+      log('Panel already exists, revealing');
       TerminalGridPanel.currentPanel.panel.reveal(column);
       return;
     }
 
+    log('Creating new webview panel');
     const panel = vscode.window.createWebviewPanel(
       TerminalGridPanel.viewType,
       'Grid',
@@ -42,15 +46,24 @@ export class TerminalGridPanel {
   }
 
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    log('TerminalGridPanel constructor');
     this.panel = panel;
     this.extensionUri = extensionUri;
 
-    this.ptyManager = new PtyManager((id, data) => {
-      this.panel.webview.postMessage({ type: 'output', id, data });
-    });
+    this.ptyManager = new PtyManager(
+      (id, data) => {
+        this.panel.webview.postMessage({ type: 'output', id, data });
+      },
+      (id) => {
+        log(`Terminal ${id} exited`);
+        this.panel.webview.postMessage({ type: 'removeTerminal', id });
+      }
+    );
 
     this.panel.iconPath = new vscode.ThemeIcon('terminal');
+    log('Setting webview HTML');
     this.panel.webview.html = this.getHtmlForWebview();
+    log('Webview HTML set');
 
     this.panel.webview.onDidReceiveMessage(
       (message) => this.handleMessage(message),
@@ -62,6 +75,7 @@ export class TerminalGridPanel {
   }
 
   public addTerminal() {
+    log('addTerminal called');
     const cwd =
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
       process.env.HOME ||
@@ -71,18 +85,22 @@ export class TerminalGridPanel {
     const shell = config.get<string>('defaultShell') || undefined;
 
     this.terminalCounter++;
+    log(`Spawning terminal #${this.terminalCounter}, cwd=${cwd}, shell=${shell || 'default'}`);
     const id = this.ptyManager.createTerminal(cwd, shell);
+    log(`Terminal spawned with id=${id}`);
 
     this.panel.webview.postMessage({
       type: 'addTerminal',
       id,
       title: `Terminal ${this.terminalCounter}`,
     });
+    log(`postMessage(addTerminal) sent for ${id}`);
   }
 
   private handleMessage(message: Record<string, unknown>) {
     const type = message.type;
     const id = typeof message.id === 'string' ? message.id : undefined;
+    log(`Webview message: type=${type}, id=${id || 'none'}`);
 
     switch (type) {
       case 'ready': {

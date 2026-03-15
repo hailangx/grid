@@ -1,7 +1,14 @@
 .vscode/**
 src/**
+.git/**
 .gitignore
 tsconfig.json
 esbuild.js
+gen_icon.py
 **/*.ts
 **/*.map
+node_modules/**/.github/**
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/docs/**
+node_modules/**/examples/**
