@@ -23,6 +23,7 @@ interface TerminalCell {
 interface GridConfig {
   fontSize: number;
   fontFamily: string;
+  showCwd: boolean;
 }
 
 class TerminalGrid {
@@ -33,6 +34,7 @@ class TerminalGrid {
   private config: GridConfig = {
     fontSize: 13,
     fontFamily: "'Cascadia Code', 'Fira Code', Menlo, Monaco, monospace",
+    showCwd: true,
   };
 
   constructor() {
@@ -56,10 +58,22 @@ class TerminalGrid {
       vscode.postMessage({ type: 'requestNewTerminal' });
     });
 
+    const closeAllBtn = document.getElementById('close-all');
+    closeAllBtn?.addEventListener('click', () => {
+      wlog('Close All button clicked');
+      vscode.postMessage({ type: 'closeAllTerminals' });
+    });
+
     const broadcastBtn = document.getElementById('broadcast')!;
     broadcastBtn.addEventListener('click', () => {
       this.broadcastMode = !this.broadcastMode;
       broadcastBtn.classList.toggle('active', this.broadcastMode);
+    });
+
+    // Double-click grid name to rename
+    const gridNameEl = document.getElementById('grid-name');
+    gridNameEl?.addEventListener('dblclick', () => {
+      this.startRename(gridNameEl);
     });
   }
 
@@ -94,6 +108,11 @@ class TerminalGrid {
         case 'config':
           this.config.fontSize = message.fontSize ?? this.config.fontSize;
           this.config.fontFamily = message.fontFamily ?? this.config.fontFamily;
+          this.config.showCwd = message.showCwd ?? this.config.showCwd;
+          if (message.gridName) {
+            const nameEl = document.getElementById('grid-name');
+            if (nameEl) nameEl.textContent = message.gridName;
+          }
           break;
         case 'output':
           this.terminals.get(message.id)?.terminal.write(message.data);
@@ -103,6 +122,9 @@ class TerminalGrid {
           break;
         case 'removeTerminal':
           this.removeTerminalCell(message.id);
+          break;
+        case 'clearAll':
+          this.clearAllCells();
           break;
       }
     });
@@ -232,6 +254,46 @@ class TerminalGrid {
         this.activeTerminalId = null;
       }
     }
+  }
+
+  private clearAllCells() {
+    this.terminals.forEach((cell) => {
+      cell.terminal.dispose();
+      cell.element.remove();
+    });
+    this.terminals.clear();
+    this.activeTerminalId = null;
+    this.updateGridLayout();
+    this.updateTerminalCount();
+  }
+
+  private startRename(el: HTMLElement) {
+    const current = el.textContent || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'toolbar-rename-input';
+    input.value = current;
+
+    el.textContent = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+
+    const commit = () => {
+      const newName = input.value.trim() || current;
+      el.textContent = newName;
+      vscode.postMessage({ type: 'renameGrid', name: newName });
+    };
+
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === 'Escape') {
+        el.textContent = current;
+      }
+    });
   }
 
   private setActiveTerminal(id: string) {

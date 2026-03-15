@@ -49,10 +49,29 @@ export function activate(context: vscode.ExtensionContext) {
 
     vscode.commands.registerCommand('grid.addTerminal', () => {
       log('Command: grid.addTerminal');
-      if (TerminalGridPanel.currentPanel) {
-        TerminalGridPanel.currentPanel.addTerminal();
-      } else {
-        TerminalGridPanel.createOrShow(context);
+      const panel = TerminalGridPanel.getAvailablePanel(context);
+      panel.addTerminal();
+    }),
+
+    vscode.commands.registerCommand('grid.closeAllTerminals', () => {
+      log('Command: grid.closeAllTerminals');
+      TerminalGridPanel.closeAll();
+    }),
+
+    vscode.commands.registerCommand('grid.renameGrid', async () => {
+      log('Command: grid.renameGrid');
+      const panel = TerminalGridPanel.currentPanel;
+      if (!panel) {
+        vscode.window.showInformationMessage('No Grid panel is open.');
+        return;
+      }
+      const name = await vscode.window.showInputBox({
+        prompt: 'Enter a new name for this Grid tab',
+        value: '',
+        placeHolder: 'e.g. Backend, Frontend, DevOps',
+      });
+      if (name) {
+        panel.rename(name);
       }
     }),
 
@@ -81,9 +100,9 @@ export function activate(context: vscode.ExtensionContext) {
       ): vscode.ProviderResult<vscode.TerminalProfile> {
         log('Terminal profile provider triggered');
         // Open grid and add a terminal cell
-        TerminalGridPanel.createOrShow(context);
+        const panel = TerminalGridPanel.getAvailablePanel(context);
         setTimeout(() => {
-          TerminalGridPanel.currentPanel?.addTerminal();
+          panel.addTerminal();
         }, 200);
 
         // Return a stub profile for the built-in panel
@@ -106,9 +125,9 @@ export function activate(context: vscode.ExtensionContext) {
       if (terminal.name === 'Grid') return;
 
       terminal.dispose();
-      TerminalGridPanel.createOrShow(context);
+      const panel = TerminalGridPanel.getAvailablePanel(context);
       setTimeout(() => {
-        TerminalGridPanel.currentPanel?.addTerminal();
+        panel.addTerminal();
       }, 200);
     })
   );

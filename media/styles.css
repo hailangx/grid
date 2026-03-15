@@ -52,6 +52,45 @@ body {
   border-color: #007acc;
 }
 
+.toolbar-btn-danger {
+  color: #f48771;
+}
+
+.toolbar-btn-danger:hover {
+  background: #5a1d1d;
+  color: #f44747;
+}
+
+.toolbar-grid-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cccccc;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: default;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar-grid-name:hover {
+  background: #3c3c3c;
+  cursor: pointer;
+}
+
+.toolbar-rename-input {
+  background: #3c3c3c;
+  color: #ffffff;
+  border: 1px solid #007acc;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  width: 120px;
+}
+
 .toolbar-separator {
   width: 1px;
   height: 18px;

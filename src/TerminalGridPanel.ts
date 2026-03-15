@@ -1,32 +1,59 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { PtyManager } from './PtyManager';
 import { log } from './log';
 
 export class TerminalGridPanel {
-  public static currentPanel: TerminalGridPanel | undefined;
   public static readonly viewType = 'grid';
 
-  private readonly panel: vscode.WebviewPanel;
-  private readonly extensionUri: vscode.Uri;
-  private readonly ptyManager: PtyManager;
-  private readonly disposables: vscode.Disposable[] = [];
-  private terminalCounter = 0;
+  // ── Multi-panel management ─────────────────────────────
+  private static panels: TerminalGridPanel[] = [];
+  private static globalTerminalCounter = 0;
+  private static panelCounter = 0;
 
-  public static createOrShow(context: vscode.ExtensionContext) {
-    log('createOrShow called');
-    const column = vscode.ViewColumn.Active;
+  public static get currentPanel(): TerminalGridPanel | undefined {
+    return TerminalGridPanel.panels[TerminalGridPanel.panels.length - 1];
+  }
 
-    if (TerminalGridPanel.currentPanel) {
-      log('Panel already exists, revealing');
-      TerminalGridPanel.currentPanel.panel.reveal(column);
-      return;
+  /** Find the best panel to add a terminal to (or create a new one). */
+  public static getAvailablePanel(context: vscode.ExtensionContext): TerminalGridPanel {
+    const config = vscode.workspace.getConfiguration('grid');
+    const maxPerGrid = config.get<number>('maxTerminalsPerGrid') ?? 9;
+
+    // Find an existing panel with room
+    const available = TerminalGridPanel.panels.find(p => p.terminalCount < maxPerGrid);
+    if (available) {
+      available.panel.reveal();
+      return available;
     }
 
-    log('Creating new webview panel');
+    // All full (or none exist) — create a new one
+    return TerminalGridPanel.createNew(context);
+  }
+
+  public static createOrShow(context: vscode.ExtensionContext): TerminalGridPanel {
+    log('createOrShow called');
+
+    // If panels exist, reveal the last one
+    if (TerminalGridPanel.panels.length > 0) {
+      const last = TerminalGridPanel.panels[TerminalGridPanel.panels.length - 1];
+      log('Panel already exists, revealing');
+      last.panel.reveal();
+      return last;
+    }
+
+    return TerminalGridPanel.createNew(context);
+  }
+
+  private static createNew(context: vscode.ExtensionContext): TerminalGridPanel {
+    TerminalGridPanel.panelCounter++;
+    const gridName = `Grid ${TerminalGridPanel.panelCounter}`;
+
+    log(`Creating new webview panel: ${gridName}`);
     const panel = vscode.window.createWebviewPanel(
       TerminalGridPanel.viewType,
-      'Grid',
-      column,
+      gridName,
+      vscode.ViewColumn.Active,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -38,17 +65,39 @@ export class TerminalGridPanel {
       }
     );
 
-    TerminalGridPanel.currentPanel = new TerminalGridPanel(panel, context.extensionUri);
+    const gridPanel = new TerminalGridPanel(panel, context.extensionUri, gridName);
+    TerminalGridPanel.panels.push(gridPanel);
+    log(`Panel created: ${gridName} (total: ${TerminalGridPanel.panels.length})`);
+    return gridPanel;
   }
 
   public static revive(panel: vscode.WebviewPanel, context: vscode.ExtensionContext) {
-    TerminalGridPanel.currentPanel = new TerminalGridPanel(panel, context.extensionUri);
+    TerminalGridPanel.panelCounter++;
+    const gridName = `Grid ${TerminalGridPanel.panelCounter}`;
+    const gridPanel = new TerminalGridPanel(panel, context.extensionUri, gridName);
+    TerminalGridPanel.panels.push(gridPanel);
   }
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+  public static closeAll() {
+    log('Closing all grid panels');
+    // Copy array since dispose mutates it
+    [...TerminalGridPanel.panels].forEach(p => p.dispose());
+  }
+
+  // ── Instance ───────────────────────────────────────────
+
+  private readonly panel: vscode.WebviewPanel;
+  private readonly extensionUri: vscode.Uri;
+  private readonly ptyManager: PtyManager;
+  private readonly disposables: vscode.Disposable[] = [];
+  private terminalCount = 0;
+  private gridName: string;
+
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, gridName: string) {
     log('TerminalGridPanel constructor');
     this.panel = panel;
     this.extensionUri = extensionUri;
+    this.gridName = gridName;
 
     this.ptyManager = new PtyManager(
       (id, data) => {
@@ -56,6 +105,7 @@ export class TerminalGridPanel {
       },
       (id) => {
         log(`Terminal ${id} exited`);
+        this.terminalCount--;
         this.panel.webview.postMessage({ type: 'removeTerminal', id });
       }
     );
@@ -83,18 +133,37 @@ export class TerminalGridPanel {
 
     const config = vscode.workspace.getConfiguration('grid');
     const shell = config.get<string>('defaultShell') || undefined;
+    const showCwd = config.get<boolean>('showCwdInTitle') ?? true;
 
-    this.terminalCounter++;
-    log(`Spawning terminal #${this.terminalCounter}, cwd=${cwd}, shell=${shell || 'default'}`);
+    TerminalGridPanel.globalTerminalCounter++;
+    this.terminalCount++;
+
+    const num = TerminalGridPanel.globalTerminalCounter;
+    const title = showCwd
+      ? `${num}: ${path.basename(cwd)}`
+      : `Terminal ${num}`;
+
+    log(`Spawning terminal #${num}, cwd=${cwd}, shell=${shell || 'default'}`);
     const id = this.ptyManager.createTerminal(cwd, shell);
     log(`Terminal spawned with id=${id}`);
 
     this.panel.webview.postMessage({
       type: 'addTerminal',
       id,
-      title: `Terminal ${this.terminalCounter}`,
+      title,
+      cwd,
     });
     log(`postMessage(addTerminal) sent for ${id}`);
+  }
+
+  public rename(newName: string) {
+    this.gridName = newName;
+    this.panel.title = newName;
+    log(`Panel renamed to: ${newName}`);
+  }
+
+  public getTerminalCount(): number {
+    return this.terminalCount;
   }
 
   private handleMessage(message: Record<string, unknown>) {
@@ -110,11 +179,14 @@ export class TerminalGridPanel {
         const fontFamily =
           config.get<string>('fontFamily') ??
           "'Cascadia Code', 'Fira Code', Menlo, Monaco, monospace";
+        const showCwd = config.get<boolean>('showCwdInTitle') ?? true;
 
         this.panel.webview.postMessage({
           type: 'config',
           fontSize,
           fontFamily,
+          showCwd,
+          gridName: this.gridName,
         });
 
         for (let i = 0; i < count; i++) {
@@ -146,7 +218,21 @@ export class TerminalGridPanel {
       case 'closeTerminal':
         if (id) {
           this.ptyManager.destroyTerminal(id);
+          this.terminalCount--;
           this.panel.webview.postMessage({ type: 'removeTerminal', id });
+        }
+        break;
+
+      case 'closeAllTerminals':
+        log('closeAllTerminals requested from webview');
+        this.ptyManager.dispose();
+        this.terminalCount = 0;
+        this.panel.webview.postMessage({ type: 'clearAll' });
+        break;
+
+      case 'renameGrid':
+        if (typeof message.name === 'string') {
+          this.rename(message.name);
         }
         break;
     }
@@ -190,8 +276,13 @@ export class TerminalGridPanel {
 </head>
 <body>
   <div class="toolbar">
+    <span id="grid-name" class="toolbar-grid-name" title="Double-click to rename">${this.gridName}</span>
+    <div class="toolbar-separator"></div>
     <button id="add-terminal" class="toolbar-btn" title="Add new terminal (Ctrl+Shift+T)">
-      <span class="codicon">+</span> New Terminal
+      + New
+    </button>
+    <button id="close-all" class="toolbar-btn toolbar-btn-danger" title="Close all terminals">
+      ✕ Close All
     </button>
     <div class="toolbar-separator"></div>
     <button id="broadcast" class="toolbar-btn" title="Broadcast input to all terminals">
@@ -207,7 +298,13 @@ export class TerminalGridPanel {
   }
 
   private dispose() {
-    TerminalGridPanel.currentPanel = undefined;
+    // Remove from static panels array
+    const idx = TerminalGridPanel.panels.indexOf(this);
+    if (idx !== -1) {
+      TerminalGridPanel.panels.splice(idx, 1);
+    }
+    log(`Panel disposed: ${this.gridName} (remaining: ${TerminalGridPanel.panels.length})`);
+
     this.ptyManager.dispose();
     this.panel.dispose();
     while (this.disposables.length) {

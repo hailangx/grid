@@ -4,14 +4,17 @@ A VS Code extension that replaces the default terminal split view with a configu
 
 ## Features
 
-- **Grid Layout** — Terminals displayed in an auto-sizing CSS Grid instead of vertical/horizontal splits. Columns = `ceil(sqrt(n))`.
-- **Real PTY** — Full pseudo-terminal support via Python's `pty.fork()`. Colors, interactive programs, and job control all work.
+- **Grid Layout** — Terminals displayed in an auto-sizing CSS Grid. Columns = `ceil(sqrt(n))`.
+- **Multi-Grid Tabs** — When a grid reaches its terminal limit (default: 9), a new grid tab is created automatically. Each tab is independent.
+- **Rename Grid Tabs** — Double-click the grid name in the toolbar, or use the command palette to rename tabs (e.g. "Backend", "Frontend", "DevOps").
+- **CWD in Titles** — Each terminal title shows its current working directory (configurable).
+- **Close All** — One-click button to close all terminals in a grid tab.
+- **Real PTY** — Full pseudo-terminal via Python's `pty.fork()`. Colors, interactive programs, and job control work.
 - **Broadcast Mode** — Type in one terminal and input is sent to all terminals simultaneously.
-- **Terminal Profile Provider** — Registers "Grid" as a selectable terminal profile. Set it as your default so every new terminal opens in the grid.
+- **Terminal Profile Provider** — Registers "Grid" as a selectable terminal profile. Set it as your default.
 - **Intercept Mode** (opt-in) — Redirects new terminals created by other extensions or tasks into the grid.
-- **Configurable** — Shell, font size, font family, initial terminal count, all via VS Code settings.
-- **Zero native dependencies** — No `node-pty` or compiled C++ modules. Uses Python's built-in `pty` module via `child_process.spawn`.
-- **Tiny package** — ~164 KB VSIX.
+- **Zero native dependencies** — No `node-pty` or compiled C++ modules. Uses Python's built-in `pty` module.
+- **Tiny package** — ~165 KB VSIX.
 
 ## Keyboard Shortcuts
 
@@ -26,39 +29,44 @@ A VS Code extension that replaces the default terminal split view with a configu
 | Command | Description |
 |---|---|
 | `Grid: Open Grid` | Open the terminal grid panel |
-| `Grid: Add Terminal to Grid` | Add a new terminal cell to the grid |
+| `Grid: Add Terminal to Grid` | Add a new terminal (auto-creates a new tab if current is full) |
+| `Grid: Close All Terminals` | Close all grid tabs and their terminals |
+| `Grid: Rename Grid Tab` | Rename the active grid tab |
 | `Grid: Toggle Intercept New Terminals` | Toggle whether new terminals are redirected into Grid |
 
 ## How It Works
 
 1. **Extension Host** spawns shell processes via Python's `pty.fork()` (real PTY, no native modules)
-2. **Webview Panel** renders a CSS Grid of `xterm.js` terminal instances
-3. I/O is routed bidirectionally via VS Code's `postMessage` API
-4. Each terminal cell auto-resizes using the xterm `FitAddon`
+2. **GridManager** tracks multiple webview panels, each with up to N terminals (configurable via `grid.maxTerminalsPerGrid`)
+3. **Webview Panel** renders a CSS Grid of `xterm.js` terminal instances
+4. I/O is routed bidirectionally via VS Code's `postMessage` API
+5. Each terminal cell auto-resizes using the xterm `FitAddon`
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  VS Code Extension Host (Node.js)                    │
-│  ┌─────────────┐  ┌─────────────────────────────┐    │
-│  │ PtyManager   │  │ TerminalGridPanel            │   │
-│  │ (python pty) │◄─┤ (WebviewPanel controller)    │   │
-│  └──────┬──────┘  └──────────┬──────────────────┘    │
-│         │ spawn/write        │ postMessage            │
-└─────────┼────────────────────┼───────────────────────┘
-          │                    │
-          ▼                    ▼
-┌──────────────────────────────────────────────────────┐
-│  Webview (Browser)                                   │
-│  ┌──────────────────────────────────────────────┐    │
-│  │ Terminal Grid UI                              │    │
-│  │ ┌──────────┐ ┌──────────┐ ┌──────────┐       │    │
-│  │ │ xterm.js │ │ xterm.js │ │ xterm.js │       │    │
-│  │ │ + Fit    │ │ + Fit    │ │ + Fit    │       │    │
-│  │ └──────────┘ └──────────┘ └──────────┘       │    │
-│  └──────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────┘
+│ VS Code Extension Host (Node.js)                     │
+│                                                      │
+│  ┌─ GridManager ──────────────────────────────────┐  │
+│  │  Panel "Backend"    Panel "Frontend"   ...     │  │
+│  │  ┌──────────────┐  ┌──────────────┐           │  │
+│  │  │ PtyManager   │  │ PtyManager   │           │  │
+│  │  │ (python pty) │  │ (python pty) │           │  │
+│  │  └──────┬───────┘  └──────┬───────┘           │  │
+│  └─────────┼─────────────────┼───────────────────┘  │
+│            │ postMessage     │ postMessage           │
+└────────────┼─────────────────┼──────────────────────┘
+             ▼                 ▼
+┌──────────────────┐  ┌──────────────────┐
+│  Webview "Backend"│  │ Webview "Frontend"│
+│  ┌────┐ ┌────┐   │  │  ┌────┐ ┌────┐   │
+│  │term│ │term│   │  │  │term│ │term│   │
+│  └────┘ └────┘   │  │  └────┘ └────┘   │
+│  ┌────┐ ┌────┐   │  │  ┌────┐          │
+│  │term│ │term│   │  │  │term│          │
+│  └────┘ └────┘   │  │  └────┘          │
+└──────────────────┘  └──────────────────┘
 ```
 
 ## Make Grid Your Default Terminal
@@ -81,6 +89,8 @@ Or enable intercept mode to redirect **all** new terminals into the grid:
 |---------|---------|-------------|
 | `grid.defaultShell` | `""` | Shell to use (empty = system default) |
 | `grid.initialCount` | `1` | Number of terminals to create when opening the grid |
+| `grid.maxTerminalsPerGrid` | `9` | Max terminals per grid tab. New tab created when full. |
+| `grid.showCwdInTitle` | `true` | Show the current working directory in terminal titles |
 | `grid.fontSize` | `13` | Font size for terminal text |
 | `grid.fontFamily` | `'Cascadia Code', ...` | Font family for terminal text |
 | `grid.interceptNewTerminals` | `false` | Redirect new terminals from other extensions into Grid |
