@@ -1,0 +1,171 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: #1e1e1e;
+  color: #cccccc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  gap: 6px;
+  height: 33px;
+  user-select: none;
+}
+
+.toolbar-btn {
+  background: #3c3c3c;
+  color: #cccccc;
+  border: 1px solid transparent;
+  padding: 3px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.toolbar-btn:hover {
+  background: #505050;
+}
+
+.toolbar-btn:active {
+  background: #5a5a5a;
+}
+
+.toolbar-btn.active {
+  background: #007acc;
+  color: #ffffff;
+  border-color: #007acc;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 18px;
+  background: #3c3c3c;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-info {
+  font-size: 11px;
+  color: #888;
+  padding-right: 4px;
+}
+
+/* ── Grid ────────────────────────────────────────────────── */
+
+.terminal-grid {
+  display: grid;
+  height: calc(100% - 33px);
+  gap: 2px;
+  padding: 2px;
+}
+
+/* ── Terminal Cell ───────────────────────────────────────── */
+
+.terminal-cell {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  transition: border-color 0.15s;
+}
+
+.terminal-cell.active {
+  border-color: #007acc;
+}
+
+/* ── Terminal Header ─────────────────────────────────────── */
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 8px;
+  background: #2d2d2d;
+  font-size: 11px;
+  user-select: none;
+  flex-shrink: 0;
+  height: 24px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.terminal-cell.active .terminal-header {
+  background: #007acc;
+  color: #ffffff;
+  border-bottom-color: #007acc;
+}
+
+.terminal-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.terminal-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 8px;
+  opacity: 0.5;
+  border-radius: 3px;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.terminal-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Terminal Wrapper ────────────────────────────────────── */
+
+.terminal-wrapper {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.terminal-wrapper .xterm {
+  height: 100%;
+  padding: 4px;
+}
+
+.terminal-wrapper .xterm-viewport {
+  overflow-y: auto;
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+
+.terminal-grid:empty::after {
+  content: 'Click "+ New Terminal" to get started';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 14px;
+  height: 100%;
+}

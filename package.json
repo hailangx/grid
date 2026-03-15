@@ -1,0 +1,105 @@
+{
+  "name": "grid",
+  "displayName": "Grid",
+  "description": "Replace the default terminal split view with a configurable grid of terminals",
+  "version": "0.1.0",
+  "publisher": "grid",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onTerminalProfile:grid.profile"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "grid.open",
+        "title": "Open Grid",
+        "category": "Grid",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "grid.addTerminal",
+        "title": "Add Terminal to Grid",
+        "category": "Grid"
+      },
+      {
+        "command": "grid.toggleIntercept",
+        "title": "Toggle Intercept New Terminals",
+        "category": "Grid"
+      }
+    ],
+    "terminal": {
+      "profiles": [
+        {
+          "id": "grid.profile",
+          "title": "Grid",
+          "icon": "terminal"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "grid.open",
+        "key": "ctrl+shift+`",
+        "mac": "cmd+shift+`"
+      }
+    ],
+    "configuration": {
+      "title": "Grid",
+      "properties": {
+        "grid.defaultShell": {
+          "type": "string",
+          "default": "",
+          "description": "Default shell to use. Leave empty to use system default."
+        },
+        "grid.initialCount": {
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Number of terminals to create when opening the grid."
+        },
+        "grid.fontSize": {
+          "type": "number",
+          "default": 13,
+          "minimum": 8,
+          "maximum": 32,
+          "description": "Font size for terminals in the grid."
+        },
+        "grid.fontFamily": {
+          "type": "string",
+          "default": "'Cascadia Code', 'Fira Code', Menlo, Monaco, monospace",
+          "description": "Font family for terminals in the grid."
+        },
+        "grid.interceptNewTerminals": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, new terminals opened by extensions or tasks are redirected into Grid."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "build": "node esbuild.js --production",
+    "check": "tsc --noEmit",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  }
+}
