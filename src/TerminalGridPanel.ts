@@ -124,9 +124,10 @@ export class TerminalGridPanel {
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
   }
 
-  public addTerminal() {
+  public addTerminal(requestedCwd?: string) {
     log('addTerminal called');
     const cwd =
+      requestedCwd ||
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
       process.env.HOME ||
       '/';

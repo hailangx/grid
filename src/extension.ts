@@ -1,6 +1,33 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { TerminalGridPanel } from './TerminalGridPanel';
 import { log, initLog } from './log';
+
+/**
+ * Resolve a CWD from a URI argument (e.g. Explorer context menu),
+ * the active editor, or fall back to undefined (let addTerminal decide).
+ */
+function resolveCwd(uri?: vscode.Uri): string | undefined {
+  // 1. Explicit URI from context menu
+  if (uri?.fsPath) {
+    try {
+      const stat = fs.statSync(uri.fsPath);
+      return stat.isDirectory() ? uri.fsPath : path.dirname(uri.fsPath);
+    } catch {
+      return path.dirname(uri.fsPath);
+    }
+  }
+
+  // 2. Active editor file
+  const activeFile = vscode.window.activeTextEditor?.document.uri;
+  if (activeFile?.scheme === 'file') {
+    return path.dirname(activeFile.fsPath);
+  }
+
+  // 3. Let addTerminal fall back to workspace folder / $HOME
+  return undefined;
+}
 
 /**
  * Stub Pseudoterminal that lives in VS Code's built-in terminal panel.
@@ -47,10 +74,18 @@ export function activate(context: vscode.ExtensionContext) {
       TerminalGridPanel.createOrShow(context);
     }),
 
-    vscode.commands.registerCommand('grid.addTerminal', () => {
+    vscode.commands.registerCommand('grid.addTerminal', (uri?: vscode.Uri) => {
       log('Command: grid.addTerminal');
+      const cwd = resolveCwd(uri);
       const panel = TerminalGridPanel.getAvailablePanel(context);
-      panel.addTerminal();
+      panel.addTerminal(cwd);
+    }),
+
+    vscode.commands.registerCommand('grid.openHere', (uri?: vscode.Uri) => {
+      log('Command: grid.openHere');
+      const cwd = resolveCwd(uri);
+      const panel = TerminalGridPanel.getAvailablePanel(context);
+      panel.addTerminal(cwd);
     }),
 
     vscode.commands.registerCommand('grid.closeAllTerminals', () => {

@@ -58,6 +58,11 @@
         "command": "grid.renameGrid",
         "title": "Rename Grid Tab",
         "category": "Grid"
+      },
+      {
+        "command": "grid.openHere",
+        "title": "Open in Grid",
+        "category": "Grid"
       }
     ],
     "terminal": {
@@ -76,6 +81,21 @@
         "mac": "cmd+shift+`"
       }
     ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "grid.openHere",
+          "group": "navigation@100",
+          "when": "explorerResourceIsFolder"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "grid.openHere",
+          "group": "2_files"
+        }
+      ]
+    },
     "configuration": {
       "title": "Grid",
       "properties": {
